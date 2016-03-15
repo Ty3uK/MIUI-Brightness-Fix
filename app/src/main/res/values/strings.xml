@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">MIUI Brightness Fix</string>
+    <string name="description">Fixes autobrightness and minimal brightness level on MIUIv7</string>
+    <string name="auto_brightness_levels">Auto brightness levels</string>
+    <string name="auto_brightness_lcd_backlight_values">Auto brightness LCD backlight values</string>
+    <string name="save">Save</string>
+
+    <string name="parsing_error">Error parsing an integer array. Array must be formatted as int, int, &#8230;, int</string>
+    <string name="save_success">Saved successfully. Reboot your phone.</string>
+</resources>
