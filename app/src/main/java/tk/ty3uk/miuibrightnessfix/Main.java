@@ -45,16 +45,16 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
         if (!lpparam.packageName.equals("android"))
             return;
 
-        //if (Build.VERSION.SDK_INT > Build.VERSION_CODES.KITKAT) {
-            final Class<?> AutomaticBrightnessController = XposedHelpers.findClass("com.android.server.display.AutomaticBrightnessController", lpparam.classLoader);
-            final Class<?> AutomaticBrightnessController$1 = XposedHelpers.findClass("com.android.server.display.AutomaticBrightnessController$1", lpparam.classLoader);
-            final Class<?> DisplayPowerController = XposedHelpers.findClass("com.android.server.display.DisplayPowerController", lpparam.classLoader);
+        final Class<?> AutomaticBrightnessController = XposedHelpers.findClass("com.android.server.display.AutomaticBrightnessController", lpparam.classLoader);
+        final Class<?> AutomaticBrightnessController$1 = XposedHelpers.findClass("com.android.server.display.AutomaticBrightnessController$1", lpparam.classLoader);
+        final Class<?> DisplayPowerController = XposedHelpers.findClass("com.android.server.display.DisplayPowerController", lpparam.classLoader);
 
-            final long BRIGHTENING_LIGHT_DEBOUNCE = 0x07D0;
-            final long DARKENING_LIGHT_DEBOUNCE = 0x0FA0;
+        final long BRIGHTENING_LIGHT_DEBOUNCE = 0x07D0;
+        final long DARKENING_LIGHT_DEBOUNCE = 0x0FA0;
 
-            final int LOW_DIMMING_PROTECTION_THRESHOLD = 1;
+        final int LOW_DIMMING_PROTECTION_THRESHOLD = 1;
 
+        try {
             XposedHelpers.findAndHookMethod(AutomaticBrightnessController$1, "onSensorChanged", SensorEvent.class, new XC_MethodReplacement() {
                 @Override
                 protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
@@ -83,7 +83,11 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
                     return null;
                 }
             });
+        } catch (NoSuchMethodError e) {
+            XposedBridge.log("No such method: onSensorChanged");
+        }
 
+        try {
             XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightBrighteningTransition", long.class, new XC_MethodReplacement() {
                 @Override
                 protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
@@ -105,7 +109,11 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
                     }
                 }
             });
+        } catch (NoSuchMethodError e) {
+            XposedBridge.log("No such method: nextAmbientLightBrighteningTransition");
+        }
 
+        try {
             XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightDarkeningTransition", long.class, new XC_MethodReplacement() {
                 @Override
                 protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
@@ -127,8 +135,14 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
                     }
                 }
             });
+        } catch (NoSuchMethodError e) {
+            XposedBridge.log("No such method: nextAmbientLightDarkeningTransition");
+        }
 
+        try {
             XposedHelpers.findAndHookMethod(DisplayPowerController, "protectedMinimumBrightness", XC_MethodReplacement.returnConstant(LOW_DIMMING_PROTECTION_THRESHOLD));
-        //}
+        } catch (NoSuchMethodError e) {
+            XposedBridge.log("No such method: protectedMinimumBrightness");
+        }
     }
 }

@@ -4,6 +4,14 @@ android {
     compileSdkVersion 23
     buildToolsVersion "23.0.2"
 
+    defaultConfig {
+        applicationId "tk.ty3uk.miuibrightnessfix"
+        minSdkVersion 21
+        targetSdkVersion 23
+        versionCode 3
+        versionName "1.2"
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -14,5 +22,4 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    testCompile 'junit:junit:4.12'
 }
