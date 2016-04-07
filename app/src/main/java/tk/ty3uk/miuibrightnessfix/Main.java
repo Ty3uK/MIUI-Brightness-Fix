@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.XModuleResources;
 import android.content.res.XResources;
 
+import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
@@ -18,26 +19,26 @@ import android.hardware.SensorEvent;
 import android.os.Build;
 import android.os.SystemClock;
 
+import java.lang.reflect.Method;
+
 public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
     @Override
     public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.KITKAT) {
-            XModuleResources modRes = XModuleResources.createInstance(startupParam.modulePath, null);
+        XModuleResources modRes = XModuleResources.createInstance(startupParam.modulePath, null);
 
-            XSharedPreferences pref = new XSharedPreferences("tk.ty3uk.miuibrightnessfix", "levels");
-            pref.makeWorldReadable();
+        XSharedPreferences pref = new XSharedPreferences("tk.ty3uk.miuibrightnessfix", "levels");
+        pref.makeWorldReadable();
 
-            if (pref.contains("autoBrightnessLevels") && pref.contains("autoBrightnessLcdBacklightValues")) {
-                try {
-                    XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLevels", Util.StringToIntArray(pref.getString("autoBrightnessLevels", "")));
-                    XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLcdBacklightValues", Util.StringToIntArray(pref.getString("autoBrightnessLcdBacklightValues", "")));
-                } catch (NumberFormatException nfe) {
-                    nfe.printStackTrace();
-                }
-            } else {
-                XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLevels", modRes.fwd(R.array.config_autoBrightnessLevels));
-                XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLcdBacklightValues", modRes.fwd(R.array.config_autoBrightnessLcdBacklightValues));
+        if (pref.contains("autoBrightnessLevels") && pref.contains("autoBrightnessLcdBacklightValues")) {
+            try {
+                XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLevels", Util.StringToIntArray(pref.getString("autoBrightnessLevels", "")));
+                XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLcdBacklightValues", Util.StringToIntArray(pref.getString("autoBrightnessLcdBacklightValues", "")));
+            } catch (NumberFormatException nfe) {
+                nfe.printStackTrace();
             }
+        } else {
+            XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLevels", modRes.fwd(R.array.config_autoBrightnessLevels));
+            XResources.setSystemWideReplacement("android", "array", "config_autoBrightnessLcdBacklightValues", modRes.fwd(R.array.config_autoBrightnessLcdBacklightValues));
         }
     }
 
@@ -55,32 +56,41 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
         final int LOW_DIMMING_PROTECTION_THRESHOLD = 1;
 
         try {
-            XposedHelpers.findAndHookMethod(AutomaticBrightnessController$1, "onSensorChanged", SensorEvent.class, new XC_MethodReplacement() {
+            XposedHelpers.findAndHookMethod(AutomaticBrightnessController$1, "onSensorChanged", SensorEvent.class, new XC_MethodHook() {
                 @Override
-                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
-                    Object this$0 = XposedHelpers.getObjectField(param.thisObject, "this$0");
-                    SensorEvent paramSensorEvent = (SensorEvent) param.args[0];
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    long mPrevLogTime;
+                    float mPrevLogLux;
 
-                    boolean mLightSensorEnabled = (boolean) XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$200", this$0);
+                    try {
+                        mPrevLogTime = XposedHelpers.getLongField(param.thisObject, "mPrevLogTime");
+                        mPrevLogLux = XposedHelpers.getFloatField(param.thisObject, "mPrevLogLux");
 
-                    if (mLightSensorEnabled) {
-                        long time = SystemClock.uptimeMillis();
-                        float lux = paramSensorEvent.values[0];
+                        Object this$0 = XposedHelpers.getObjectField(param.thisObject, "this$0");
+                        SensorEvent paramSensorEvent = (SensorEvent) param.args[0];
 
-                        XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$302", lux);
-                        XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$400", this$0, time, lux);
+                        boolean mLightSensorEnabled = (boolean) XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$200", this$0);
 
-                        long mPrevLogTime = XposedHelpers.getLongField(param.thisObject, "mPrevLogTime");
-                        float mPrevLogLux = XposedHelpers.getFloatField(param.thisObject, "mPrevLogLux");
+                        if (mLightSensorEnabled) {
+                            long time = SystemClock.uptimeMillis();
+                            float lux = paramSensorEvent.values[0];
 
-                        if ((time - mPrevLogTime >= 500L) || (1.2F * mPrevLogLux <= lux) || (lux * 1.2F <= mPrevLogLux)) {
-                            //XposedBridge.log("time: " + time + " | mPrevLogTime: " + mPrevLogTime);
+                            XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$302", lux);
+                            XposedHelpers.callStaticMethod(AutomaticBrightnessController, "access$400", this$0, time, lux);
 
-                            XposedHelpers.setLongField(param.thisObject, "mPrevLogTime", time);
-                            XposedHelpers.setFloatField(param.thisObject, "mPrevLogLux", lux);
+                            mPrevLogTime = XposedHelpers.getLongField(param.thisObject, "mPrevLogTime");
+                            mPrevLogLux = XposedHelpers.getFloatField(param.thisObject, "mPrevLogLux");
+
+                            if ((time - mPrevLogTime >= 500L) || (1.2F * mPrevLogLux <= lux) || (lux * 1.2F <= mPrevLogLux)) {
+                                //XposedBridge.log("time: " + time + " | mPrevLogTime: " + mPrevLogTime);
+
+                                XposedHelpers.setLongField(param.thisObject, "mPrevLogTime", time);
+                                XposedHelpers.setFloatField(param.thisObject, "mPrevLogLux", lux);
+                            }
                         }
+                    } catch (NoSuchFieldError e) {
+                        //XposedBridge.log("No such fields: mPrevLogTime, mPrevLogLux");
                     }
-                    return null;
                 }
             });
         } catch (NoSuchMethodError e) {
@@ -88,21 +98,28 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
         }
 
         try {
-            XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightBrighteningTransition", long.class, new XC_MethodReplacement() {
+            XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightBrighteningTransition", long.class, new XC_MethodHook() {
                 @Override
-                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     Object mAmbientLightRingBuffer = XposedHelpers.getObjectField(param.thisObject, "mAmbientLightRingBuffer");
 
                     int i = (int) XposedHelpers.callMethod(mAmbientLightRingBuffer, "size");
                     long l = (long) param.args[0];
 
+                    float lux = 0f, mBrighteningLuxThreshold;
+
                     for (int j = i - 1; ; j--) {
-                        float lux = (float) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getLux", j);
-                        float mBrighteningLuxThreshold = (float) XposedHelpers.getObjectField(param.thisObject, "mBrighteningLuxThreshold");
+                        try {
+                            lux = (float) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getLux", j);
+                        } catch(ArrayIndexOutOfBoundsException e) {
+                            //e.printStackTrace();
+                        }
+                        mBrighteningLuxThreshold = (float) XposedHelpers.getObjectField(param.thisObject, "mBrighteningLuxThreshold");
 
                         if ((j < 0) || (lux <= mBrighteningLuxThreshold)) {
+                            //XposedBridge.log("nextAmbientLightBrighteningTransition result: " + (BRIGHTENING_LIGHT_DEBOUNCE + l));
                             param.setResult(BRIGHTENING_LIGHT_DEBOUNCE + l);
-                            return BRIGHTENING_LIGHT_DEBOUNCE + l;
+                            return;
                         }
 
                         l = (long) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getTime", j);
@@ -114,21 +131,28 @@ public class Main implements IXposedHookZygoteInit, IXposedHookLoadPackage {
         }
 
         try {
-            XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightDarkeningTransition", long.class, new XC_MethodReplacement() {
+            XposedHelpers.findAndHookMethod(AutomaticBrightnessController, "nextAmbientLightDarkeningTransition", long.class, new XC_MethodHook() {
                 @Override
-                protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     Object mAmbientLightRingBuffer = XposedHelpers.getObjectField(param.thisObject, "mAmbientLightRingBuffer");
 
                     int i = (int) XposedHelpers.callMethod(mAmbientLightRingBuffer, "size");
                     long l = (long) param.args[0];
 
+                    float lux = 0f, mDarkeningLuxThreshold;
+
                     for (int j = i - 1; ; j--) {
-                        float lux = (float) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getLux", j);
-                        float mDarkeningLuxThreshold = (float) XposedHelpers.getObjectField(param.thisObject, "mDarkeningLuxThreshold");
+                        try {
+                            lux = (float) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getLux", j);
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                            //e.printStackTrace();
+                        }
+                        mDarkeningLuxThreshold = (float) XposedHelpers.getObjectField(param.thisObject, "mDarkeningLuxThreshold");
 
                         if ((j < 0) || (lux >= mDarkeningLuxThreshold)) {
+                            //XposedBridge.log("nextAmbientLightDarkeningTransition result: " + (DARKENING_LIGHT_DEBOUNCE + l));
                             param.setResult(DARKENING_LIGHT_DEBOUNCE + l);
-                            return DARKENING_LIGHT_DEBOUNCE + l;
+                            return;
                         }
 
                         l = (long) XposedHelpers.callMethod(mAmbientLightRingBuffer, "getTime", j);
